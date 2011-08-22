@@ -1,0 +1,57 @@
+diff -up quota-tools/rquota_svc.c.goodclient quota-tools/rquota_svc.c
+--- quota-tools/rquota_svc.c.goodclient	2010-02-22 14:33:04.000000000 +0100
++++ quota-tools/rquota_svc.c	2010-02-22 14:34:02.000000000 +0100
+@@ -12,7 +12,7 @@
+  *          changes for new utilities by Jan Kara <jack@suse.cz>
+  *          patches by Jani Jaakkola <jjaakkol@cs.helsinki.fi>
+  *
+- * Version: $Id: rquota_svc.c,v 1.20 2007/08/27 12:32:57 jkar8572 Exp $
++ * Version: $Id: rquota_svc.c,v 1.21 2009/04/28 15:36:22 jkar8572 Exp $
+  *
+  *          This program is free software; you can redistribute it and/or
+  *          modify it under the terms of the GNU General Public License as
+@@ -172,8 +172,7 @@ static void parse_options(int argc, char
+ int good_client(struct sockaddr_in *addr, ulong rq_proc)
+ {
+ #ifdef HOSTS_ACCESS
+-	struct hostent *h;
+-	char *name, **ad;
++	struct request_info req;
+ #endif
+ 	char *remote = inet_ntoa(addr->sin_addr);
+ 
+@@ -199,31 +198,10 @@ int good_client(struct sockaddr_in *addr
+ 	/* NOTE: we could use different servicename for setquota calls to
+ 	 * allow only some hosts to call setquota. */
+ 
+-	/* Check IP address */
+-	if (hosts_ctl("rquotad", "", remote, ""))
++	request_init(&req, RQ_DAEMON, "rquotad", RQ_CLIENT_SIN, addr, 0);
++	sock_methods(&req);
++	if (hosts_access(&req))
+ 		return 1;
+-	/* Get address */
+-	if (!(h = gethostbyaddr((const char *)&(addr->sin_addr), sizeof(addr->sin_addr), AF_INET)))
+-		goto denied;
+-	if (!(name = alloca(strlen(h->h_name)+1)))
+-		goto denied;
+-	strcpy(name, h->h_name);
+-	/* Try to resolve it back */
+-	if (!(h = gethostbyname(name)))
+-		goto denied;
+-	for (ad = h->h_addr_list; *ad; ad++)
+-		if (!memcmp(*ad, &(addr->sin_addr), h->h_length))
+-			break;
+-	if (!*ad)	/* Our address not found? */
+-		goto denied;
+-	/* Check host name */
+-	if (hosts_ctl("rquotad", h->h_name, remote, ""))
+-		return 1;
+-	/* Check aliases */
+-	for (ad = h->h_aliases; *ad; ad++)
+-		if (hosts_ctl("rquotad", *ad, remote, ""))
+-			return 1;
+-denied:
+ 	errstr(_("Denied access to host %s\n"), remote);
+ 	return 0;
+ #else
